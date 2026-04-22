@@ -1224,45 +1224,24 @@ function DashboardPageContent() {
                 {batch.progress.llm_request_failures > 0 ? (
                   <Card className="border-border/70 shadow-sm">
                     <CardHeader>
-                      <CardTitle className="text-xl">Ocorrencias da IA externa</CardTitle>
+                      <CardTitle className="text-xl">Ocorrencias de processamento</CardTitle>
                       <CardDescription>
-                        O upload foi aceito normalmente, mas houve falhas na etapa de validacao por IA.
+                        O upload foi aceito, mas parte do lote apresentou instabilidade de processamento.
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <Alert>
                         <Bot className="size-4" />
-                        <AlertTitle>Analise parcial ou com fallback</AlertTitle>
+                        <AlertTitle>Problema de processamento identificado</AlertTitle>
                         <AlertDescription>
-                          {batch.progress.llm_request_failures} falha(s) de request foram registradas.
-                          Os documentos afetados continuam visiveis abaixo, com resumo da analise e
-                          indicacao de fallback quando aplicavel.
+                          Alguns documentos podem aparecer com analise parcial. O sistema manteve o lote
+                          disponivel para revisao e exportacao.
                         </AlertDescription>
                       </Alert>
 
-                      <div className="grid gap-3 md:grid-cols-2">
-                        {batch.progress.provider_issues.length > 0 ? (
-                          batch.progress.provider_issues.map((issue) => (
-                            <div key={issue.error_code} className="rounded-3xl border bg-muted/20 p-4">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Badge variant="outline">{issue.error_code}</Badge>
-                                <Badge variant="outline">{issue.count} ocorrencia(s)</Badge>
-                                {issue.http_status ? (
-                                  <Badge variant="outline">HTTP {issue.http_status}</Badge>
-                                ) : null}
-                              </div>
-                              <p className="mt-2 text-sm text-foreground">{issue.user_message}</p>
-                              <p className="mt-2 text-xs text-muted-foreground">
-                                Provedor: {issue.provider ?? "indisponivel"} •{" "}
-                                {issue.retryable ? "o sistema tentou recuperacao automatica" : "sem nova tentativa no mesmo provedor"}
-                              </p>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="rounded-3xl border bg-muted/20 p-4 text-sm text-muted-foreground">
-                            Houve falhas de request, mas sem um agrupamento detalhado disponivel para este lote.
-                          </div>
-                        )}
+                      <div className="rounded-3xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                        Detalhes tecnicos de falhas internas ficam restritos para auditoria operacional.
+                        Para o usuario final, o lote segue disponivel para revisao dos documentos impactados.
                       </div>
                     </CardContent>
                   </Card>
