@@ -256,7 +256,7 @@ CSV gerados pelo backend:
   - uma linha por evento de auditoria
   - inclui estagio, resultado, provider, modelo efetivo e codigos de falha
 
-Esses arquivos foram pensados para alimentar o dashboard Power BI pedido no desafio, com pelo menos:
+Esses arquivos foram pensados para alimentar o dashboard Power BI:
 
 - cards de resumo
 - grafico por tipo de anomalia
@@ -333,14 +333,5 @@ Materiais adicionais no repositorio:
 - `docs/pre-deploy-checklist.md`
 - `docs/postman-api-test-guide.md`
 - `docs/codebase-audit.md`
-
-## Entrega
-
-Os entregaveis externos do desafio devem ser publicados fora do codigo-fonte:
-
-- URL publica funcional da aplicacao
-- repositorio GitHub com historico de commits
-- dashboard Power BI publicado ou arquivo `.pbix`
-- relatorio final das anomalias encontradas
 
 Este README cobre a parte tecnica do projeto: arquitetura, execucao local, estrategia do prompt, seguranca, rastreabilidade, exportacoes e organizacao do codigo.
