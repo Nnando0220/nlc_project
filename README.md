@@ -183,6 +183,7 @@ Observacao:
 
 - as chaves de API ficam apenas no backend
 - modelos, prompt, fallback e tuning de IA usam defaults internos do codigo
+- regras de negocio, como allowlists e thresholds de anomalia, ficam versionadas no backend
 - nenhuma credencial de provedor deve ser exposta ao frontend
 
 ### Frontend
@@ -300,6 +301,7 @@ system/
 Arquivos importantes:
 
 - `backend/alembic/schema.sql`
+- `backend/app/core/business_rules.py`
 - `backend/app/services/file_processor.py`
 - `backend/app/services/openrouter_service.py`
 - `backend/app/services/anomaly_service.py`

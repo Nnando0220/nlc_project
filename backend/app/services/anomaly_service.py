@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from statistics import median
 
+from app.core.business_rules import APPROVER_MIN_OCCURRENCES, KNOWN_APPROVERS
 from app.core.config import settings
 from app.db.models.document import Document
 
@@ -107,7 +108,7 @@ class AnomalyService:
             canonical_cnpjs[supplier_key] = counts.most_common(1)[0][0]
 
         anomalies: list[dict[str, object]] = []
-        known_approvers = {_canonical_supplier(item) for item in settings.known_approvers}
+        known_approvers = {_canonical_supplier(item) for item in KNOWN_APPROVERS}
 
         for record in batch_records:
             anomalies.extend(
@@ -325,7 +326,7 @@ class AnomalyService:
                 )
 
         approver_key = str(record["approver_key"])
-        if approver_key and approver_key not in known_approvers and approver_counts.get(approver_key, 0) < settings.approver_min_occurrences:
+        if approver_key and approver_key not in known_approvers and approver_counts.get(approver_key, 0) < APPROVER_MIN_OCCURRENCES:
             anomalies.append(
                 self._build_anomaly(
                     record=record,

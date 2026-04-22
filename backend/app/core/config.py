@@ -61,8 +61,6 @@ class Settings(BaseSettings):
     processing_max_workers: int = Field(validation_alias="PROCESSING_MAX_WORKERS")
     upload_max_file_size_bytes: int = Field(validation_alias="UPLOAD_MAX_FILE_SIZE_BYTES")
     upload_max_total_size_bytes: int = Field(validation_alias="UPLOAD_MAX_TOTAL_SIZE_BYTES")
-    known_approvers: list[str] = Field(validation_alias="KNOWN_APPROVERS")
-    approver_min_occurrences: int = Field(validation_alias="APPROVER_MIN_OCCURRENCES")
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
