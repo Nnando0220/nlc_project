@@ -112,6 +112,33 @@ class FileProcessor:
             self._finalize_cancelled_batch(batch_id=batch_id, message="Lote cancelado antes de iniciar a thread de processamento.")
         return True
 
+    # Reconcila lotes orfaos apos restart ou redeploy da aplicacao.
+    def reconcile_orphaned_batches(self) -> None:
+        db = SessionLocal()
+        try:
+            batch_repo = BatchRepository(db)
+            orphaned_batches = batch_repo.list_by_statuses(["cancelling", "processing"])
+        finally:
+            db.close()
+
+        for batch in orphaned_batches:
+            if self._is_batch_tracked(batch.id):
+                continue
+            if batch.status == "cancelling":
+                self._finalize_cancelled_batch(
+                    batch_id=batch.id,
+                    message="Lote reconciliado como cancelado apos reinicio da aplicacao.",
+                )
+            else:
+                self._finalize_interrupted_batch(
+                    batch_id=batch.id,
+                    message="Processamento interrompido por reinicio da aplicacao.",
+                )
+
+    # Finaliza imediatamente um lote em cancelamento sem worker ativo.
+    def finalize_cancelled_batch(self, *, batch_id: str, message: str) -> None:
+        self._finalize_cancelled_batch(batch_id=batch_id, message=message)
+
     # Encerra o executor e fecha os clientes dos provedores de IA.
     def shutdown(self) -> None:
         with self._tracking_lock:
@@ -845,11 +872,63 @@ class FileProcessor:
         finally:
             db.close()
 
+    # Fecha como falha um lote que perdeu o worker de processamento.
+    def _finalize_interrupted_batch(self, *, batch_id: str, message: str) -> None:
+        db = SessionLocal()
+        try:
+            batch_repo = BatchRepository(db)
+            document_repo = DocumentRepository(db)
+            audit_log_repo = AuditLogRepository(db)
+            batch = batch_repo.get_by_id(batch_id)
+            if batch is None or batch.status in {"completed", "completed_with_errors", "failed", "cancelled"}:
+                return
+
+            interrupted_documents = [
+                document
+                for document in document_repo.list_all_by_batch_id(batch_id)
+                if document.status not in {"done", "error"}
+            ]
+            for document in interrupted_documents:
+                document_repo.update(
+                    document,
+                    status="error",
+                    extraction_status="failed",
+                    error_code=document.error_code or "processing_interrupted",
+                    error_message=document.error_message or message,
+                    processed_at=datetime.now(),
+                )
+
+            refreshed_documents = document_repo.list_all_by_batch_id(batch_id)
+            processed_files = sum(1 for document in refreshed_documents if document.status in {"done", "error"})
+            successful_files = sum(1 for document in refreshed_documents if document.status == "done")
+            error_files = sum(1 for document in refreshed_documents if document.status == "error")
+            batch_repo.finalize(
+                batch,
+                processed_files=processed_files,
+                successful_files=successful_files,
+                error_files=error_files,
+                anomaly_count=batch.anomaly_count,
+                status="failed",
+            )
+            audit_log_repo.create(
+                batch_id=batch_id,
+                stage="processing",
+                status="failed",
+                message=message,
+            )
+        finally:
+            db.close()
+
     # Remove o lote das estruturas internas de rastreamento.
     def _cleanup_tracking(self, batch_id: str) -> None:
         with self._tracking_lock:
             self._tracked_futures.pop(batch_id, None)
             self._cancel_events.pop(batch_id, None)
+
+    # Verifica se ainda existe worker rastreado para o lote.
+    def _is_batch_tracked(self, batch_id: str) -> bool:
+        with self._tracking_lock:
+            return batch_id in self._tracked_futures or batch_id in self._cancel_events
 
     # Cria o pool de threads usado no processamento em background.
     def _create_executor(self) -> ThreadPoolExecutor:

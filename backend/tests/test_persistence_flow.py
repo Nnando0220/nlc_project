@@ -7,8 +7,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.db.repositories import BatchRepository, DocumentRepository
 from app.db.init_db import init_db
+from app.db.session import SessionLocal
 from app.main import app
+from app.services.nf_audit_service import NFAuditService
 from app.services.nf_audit_service import file_processor
 
 
@@ -506,6 +509,83 @@ def test_nf_audit_should_allow_batch_cancellation(monkeypatch: pytest.MonkeyPatc
         progress_payload = progress_response.json()
         assert progress_payload["status"] == "cancelled"
         assert progress_payload["progress"]["processing_files"] == 0
+
+
+def test_cancel_batch_without_active_worker_should_finalize_as_cancelled() -> None:
+    init_db()
+    db = SessionLocal()
+    try:
+        batch_repo = BatchRepository(db)
+        document_repo = DocumentRepository(db)
+        batch = batch_repo.create(batch_name="Cancelamento orfao", total_files=1)
+        batch = batch_repo.mark_processing_started(batch)
+        document = document_repo.create(
+            batch_id=batch.id,
+            file_name="nota-orfa.txt",
+            file_path="nota-orfa.txt",
+            source_type="txt",
+            mime_type="text/plain",
+            file_size_bytes=10,
+            status="processing",
+            decode_status="pending",
+            parse_status="pending",
+            extraction_status="pending",
+        )
+        document_repo.update(document, status="processing")
+
+        service = NFAuditService(db)
+        service.cancel_batch(batch_id=batch.id)
+    finally:
+        db.close()
+
+    verification_db = SessionLocal()
+    try:
+        batch = BatchRepository(verification_db).get_by_id(batch.id)
+        assert batch is not None
+        assert batch.status == "cancelled"
+        assert batch.finished_at is not None
+    finally:
+        verification_db.close()
+
+
+def test_startup_should_reconcile_processing_batch_without_worker() -> None:
+    init_db()
+    db = SessionLocal()
+    try:
+        batch_repo = BatchRepository(db)
+        document_repo = DocumentRepository(db)
+        batch = batch_repo.create(batch_name="Processamento interrompido", total_files=1)
+        batch_repo.mark_processing_started(batch)
+        document_repo.create(
+            batch_id=batch.id,
+            file_name="nota-interrompida.txt",
+            file_path="nota-interrompida.txt",
+            source_type="txt",
+            mime_type="text/plain",
+            file_size_bytes=10,
+            status="processing",
+            decode_status="success",
+            parse_status="partial",
+            extraction_status="llm_processing",
+        )
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        response = client.get(f"/api/v1/nf-audits/batches/{batch.id}")
+        assert response.status_code == 200
+        assert response.json()["status"] == "failed"
+
+    verification_db = SessionLocal()
+    try:
+        batch = BatchRepository(verification_db).get_by_id(batch.id)
+        document = DocumentRepository(verification_db).list_all_by_batch_id(batch.id)[0]
+        assert batch is not None
+        assert batch.status == "failed"
+        assert document.status == "error"
+        assert document.error_code == "processing_interrupted"
+    finally:
+        verification_db.close()
 
 
 def test_public_batch_access_is_allowed() -> None:

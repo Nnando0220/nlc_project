@@ -542,7 +542,12 @@ class NFAuditService:
                 message="Cancelamento solicitado pelo usuario.",
             )
 
-        file_processor.cancel_batch(batch_id)
+        cancel_requested = file_processor.cancel_batch(batch_id)
+        if not cancel_requested:
+            file_processor.finalize_cancelled_batch(
+                batch_id=batch_id,
+                message="Lote cancelado sem worker ativo; estado reconciliado.",
+            )
         refreshed_batch = self.batch_repo.get_by_id(batch_id)
         return refreshed_batch or batch
 

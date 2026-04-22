@@ -14,6 +14,14 @@ class BatchRepository:
     def get_by_id(self, batch_id: str) -> DocumentBatch | None:
         return self.db.query(DocumentBatch).filter(DocumentBatch.id == batch_id).first()
 
+    def list_by_statuses(self, statuses: list[str]) -> list[DocumentBatch]:
+        return (
+            self.db.query(DocumentBatch)
+            .filter(DocumentBatch.status.in_(statuses))
+            .order_by(DocumentBatch.created_at.asc())
+            .all()
+        )
+
     def create(self, batch_name: str, total_files: int) -> DocumentBatch:
         batch = DocumentBatch(batch_name=batch_name, total_files=total_files, status="pending")
         self.db.add(batch)

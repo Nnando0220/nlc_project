@@ -18,6 +18,7 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     try:
         if settings.database_url.startswith("sqlite:///"):
             init_db()
+        file_processor.reconcile_orphaned_batches()
         yield
     finally:
         file_processor.shutdown()
