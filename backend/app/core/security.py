@@ -1,5 +1,6 @@
 """Middleware de seguranca HTTP para API publica."""
 
+from fnmatch import fnmatch
 import logging
 import time
 from collections import defaultdict, deque
@@ -14,6 +15,7 @@ from starlette.responses import JSONResponse, Response
 from app.core.config import settings
 
 logger = logging.getLogger("app.security")
+HEALTH_CHECK_PATHS = {"/", "/health"}
 
 
 class SecurityMiddleware(BaseHTTPMiddleware):
@@ -29,6 +31,14 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         request_id = str(uuid4())
         request.state.request_id = request_id
         start_time = time.perf_counter()
+
+        if not self._is_allowed_host(request):
+            logger.warning("request_blocked_untrusted_host request_id=%s host=%s", request_id, request.headers.get("host", ""))
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"detail": "Host nao permitido."},
+                headers={"x-request-id": request_id},
+            )
 
         if settings.require_https and not self._is_secure_request(request):
             logger.warning("request_blocked_insecure_transport request_id=%s path=%s", request_id, request.url.path)
@@ -80,6 +90,32 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                 return False
             queue.append(now)
             return True
+
+    @staticmethod
+    def _normalize_host(host_header: str) -> str:
+        """Remove porta e normaliza o host informado na request."""
+        host = host_header.split(",")[0].strip()
+        if host.startswith("[") and "]" in host:
+            return host[1 : host.index("]")]
+        if ":" in host:
+            return host.rsplit(":", 1)[0]
+        return host
+
+    @classmethod
+    def _is_allowed_host(cls, request: Request) -> bool:
+        """Valida o host apenas nos endpoints de aplicacao, sem bloquear probes."""
+        if request.url.path in HEALTH_CHECK_PATHS:
+            return True
+
+        host_header = request.headers.get("host", "")
+        if not host_header:
+            return True
+
+        host = cls._normalize_host(host_header).lower()
+        allowed_hosts = {item.lower() for item in settings.allowed_hosts}
+        allowed_hosts.update({"localhost", "127.0.0.1", "::1", "0.0.0.0"})
+
+        return any(pattern == "*" or fnmatch(host, pattern) for pattern in allowed_hosts)
 
     @staticmethod
     def _get_client_ip(request: Request) -> str:

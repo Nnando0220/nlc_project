@@ -5,7 +5,6 @@ import logging
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.routes import nf_audits
 from app.core.config import settings
@@ -41,10 +40,6 @@ if not cors_allowed_origins and settings.environment == "development":
     cors_allowed_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
 app.add_middleware(SecurityMiddleware)
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=sorted({*settings.allowed_hosts, "localhost", "127.0.0.1"}),
-)
 if cors_allowed_origins:
     app.add_middleware(
         CORSMiddleware,
