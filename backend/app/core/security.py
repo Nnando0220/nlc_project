@@ -30,7 +30,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         request.state.request_id = request_id
         start_time = time.perf_counter()
 
-        if settings.require_https and request.url.scheme != "https":
+        if settings.require_https and not self._is_secure_request(request):
             logger.warning("request_blocked_insecure_transport request_id=%s path=%s", request_id, request.url.path)
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -90,6 +90,23 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         if request.client:
             return request.client.host
         return "unknown"
+
+    @classmethod
+    def _is_secure_request(cls, request: Request) -> bool:
+        """Aceita HTTPS real, proxy HTTPS confiavel e probes locais do container."""
+        if request.url.scheme == "https":
+            return True
+
+        client_ip = cls._get_client_ip(request)
+        if client_ip in {"127.0.0.1", "::1", "localhost"}:
+            return True
+
+        forwarded_proto = request.headers.get("x-forwarded-proto", "")
+        if any(item.strip().lower() == "https" for item in forwarded_proto.split(",")):
+            return True
+
+        forwarded = request.headers.get("forwarded", "").lower()
+        return "proto=https" in forwarded
 
     @staticmethod
     def _apply_security_headers(response: Response, request: Request) -> None:

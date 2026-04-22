@@ -41,7 +41,10 @@ if not cors_allowed_origins and settings.environment == "development":
     cors_allowed_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
 app.add_middleware(SecurityMiddleware)
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=sorted({*settings.allowed_hosts, "localhost", "127.0.0.1"}),
+)
 if cors_allowed_origins:
     app.add_middleware(
         CORSMiddleware,
@@ -53,6 +56,11 @@ if cors_allowed_origins:
     )
 
 app.include_router(nf_audits.router, prefix="/api/v1", tags=["nf-audits"])
+
+
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"status": "ok", "health": "/health", "docs": "/docs"}
 
 
 @app.exception_handler(Exception)
