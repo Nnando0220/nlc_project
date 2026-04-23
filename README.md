@@ -1,22 +1,47 @@
 # Auditor de Documentos com IA
 
-Aplicacao web para processar lotes de documentos financeiros em `.txt` ou `.zip`, extrair campos com parser local + API de IA, detectar anomalias, acompanhar o progresso em tempo real e exportar os resultados em CSV para consumo no Power BI.
+Aplicacao web para processar lotes de documentos financeiros em `.txt` ou `.zip`, extrair campos com parser local, opcionalmente validar os casos elegiveis com API de IA, detectar anomalias, acompanhar o progresso em tempo real e exportar os resultados em CSV para consumo no Power BI.
 
 Este repositorio foi organizado para atender ao desafio da NLConsulting, com foco em:
 
 - upload de lote
-- processamento com IA real via API
+- suporte a processamento com IA via API quando configurado
 - tratamento de arquivos problematicos
 - deteccao de anomalias
 - log de auditoria exportavel
 - documentacao tecnica e operacional
+
+Artefatos versionados neste repositorio para a entrega de BI:
+
+- `backend/reports/powerbi_results_arquivos_nf.csv`
+- `backend/reports/powerbi_anomalies_arquivos_nf.csv`
+- `backend/reports/powerbi_audit_arquivos_nf.csv`
+
+## Lote Versionado No Repositorio
+
+Os arquivos `powerbi_*.csv` versionados neste repositorio correspondem ao lote `fe991753-7f54-4a57-9220-504707231d75`.
+
+Resumo do lote:
+
+- total de arquivos: `1001`
+- documentos com anomalia: `544`
+- total de anomalias registradas: `644`
+- arquivos com erro: `2`
+- arquivos com erro de encoding: `0`
+- eventos no log de auditoria: `3650`
+
+Observacao importante:
+
+- o backend suporta validacao por IA via API quando `OPENROUTER_API_KEY`, `GROQ_API_KEY` ou `HUGGINGFACE_API_KEY` estao configuradas
+- os artefatos `powerbi_*.csv` atualmente versionados foram gerados no modo deterministico/local, identificado como `deterministic-v1` e `local-parser`, para manter a reproducibilidade do lote sem depender de credenciais externas
+- se a execucao final da entrega for rerodada com IA externa habilitada, este README deve ser atualizado para refletir o lote realmente enviado
 
 ## O que o sistema faz
 
 - Recebe multiplos `.txt` ou um `.zip` contendo varios `.txt`
 - Decodifica arquivos com fallback de encoding
 - Extrai os campos principais com parser deterministico
-- Usa API externa de IA para validar, normalizar e complementar os dados
+- Quando configurado, usa API externa de IA para validar, normalizar e complementar os dados
 - Classifica falhas da API externa sem quebrar o fluxo
 - Detecta anomalias nos documentos processados
 - Exibe progresso, documentos, alertas e ocorrencias da IA no dashboard
@@ -62,7 +87,12 @@ Arquitetura logica:
 
 ## Escolha do prompt
 
-O sistema usa a versao `nf-audit-v1`, gravada em `prompt_version` por documento processado.
+O sistema opera com dois caminhos principais:
+
+- `deterministic-v1` quando o lote e consolidado apenas com parser local
+- `nf-audit-v1` quando a validacao por IA esta habilitada e um provedor externo elegivel responde
+
+Nos artefatos `powerbi_*.csv` atualmente versionados, o lote foi exportado com `deterministic-v1`.
 
 Decisoes tecnicas da escolha do prompt:
 
@@ -82,6 +112,24 @@ Em resumo, a estrategia do prompt busca equilibrar:
 - rastreabilidade por documento
 - throughput de lote
 - protecao contra sobrescrita indevida do parser local
+
+## Relatorio Das Anomalias Encontradas
+
+Distribuicao de anomalias no lote versionado:
+
+- `TIPO_DOCUMENTO_FORA_ESCOPO`: `376`
+- `STATUS_INCONSISTENTE`: `257`
+- `CNPJ_DIVERGENTE`: `3`
+- `NF_DUPLICADA`: `2`
+- `ARQUIVO_NAO_PROCESSAVEL`: `2`
+- `EMISSAO_APOS_PAGAMENTO`: `2`
+- `FORNECEDOR_SEM_HISTORICO`: `1`
+- `APROVADOR_NAO_RECONHECIDO`: `1`
+
+Arquivos nao processaveis no lote versionado:
+
+- `DOC_0089.txt`
+- `DOC_0312.txt`
 
 ## Anomalias implementadas
 
@@ -128,7 +176,6 @@ uvicorn app.main:app --reload
 API local:
 
 - `http://localhost:8000`
-- docs OpenAPI: `http://localhost:8000/docs`
 
 ### 2. Frontend
 
@@ -325,15 +372,5 @@ Frontend:
 cd frontend
 npm run build
 ```
-
-## Documentacao complementar
-
-Materiais adicionais no repositorio:
-
-- `docs/architecture.md`
-- `docs/matriz-requisitos-entrega.md`
-- `docs/pre-deploy-checklist.md`
-- `docs/postman-api-test-guide.md`
-- `docs/codebase-audit.md`
 
 Este README cobre a parte tecnica do projeto: arquitetura, execucao local, estrategia do prompt, seguranca, rastreabilidade, exportacoes e organizacao do codigo.
